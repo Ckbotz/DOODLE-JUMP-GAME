@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doodle Jump - BY NIDHI UPMAN</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+
+        #board {
+            background-image: url("https://raw.githubusercontent.com/yourusername/your-repo/main/doodlejumpbg.png");
+            border: 2px solid #333;
+            margin: 20px auto;
+            display: block;
+        }
+
+        .controls {
+            margin: 20px auto;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            max-width: 360px;
+        }
+
+        .control-btn {
+            width: 80px;
+            height: 80px;
+            font-size: 24px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.1s;
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.1);
+        }
+
+        .control-btn:hover {
+            background-color: #45a049;
+        }
+
+        #restartBtn {
+            margin: 10px auto;
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none;
+            font-weight: bold;
+        }
+
+        #restartBtn:hover {
+            background-color: #0b7dda;
+        }
+
+        h1 {
+            color: #333;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <h1>Doodle Jump - BY NIDHI UPMAN</h1>
+    </div>
+
+    <canvas id="board"></canvas>
+
+    <div class="controls">
+        <button class="control-btn" id="leftBtn">◄</button>
+        <button class="control-btn" id="rightBtn">►</button>
+    </div>
+
+    <button id="restartBtn">Restart Game</button>
+
+    <script>
+        //board
+        let board;
+        let boardWidth = 360;
+        let boardHeight = 576;
+        let context;
+
+        //doodler
+        let doodlerWidth = 46;
+        let doodlerHeight = 46;
+        let doodlerX = boardWidth/2 - doodlerWidth/2;
+        let doodlerY = boardHeight*7/8 - doodlerHeight;
+        let doodlerRightImg;
+        let doodlerLeftImg;
+
+        let doodler = {
+            img : null,
+            x : doodlerX,
+            y : doodlerY,
+            width : doodlerWidth,
+            height : doodlerHeight
+        }
+
+        //physics
+        let velocityX = 0; 
+        let velocityY = 0;
+        let initialVelocityY = -8;
+        let gravity = 0.4;
+
+        //platforms
+        let platformArray = [];
+        let platformWidth = 60;
+        let platformHeight = 18;
+        let platformImg;
+
+        let score = 0;
+        let maxScore = 0;
+        let gameOver = false;
+
+        window.onload = function() {
+            board = document.getElementById("board");
+            board.height = boardHeight;
+            board.width = boardWidth;
+            context = board.getContext("2d");
+
+            // Load images from GitHub - REPLACE THESE URLs WITH YOUR ACTUAL GITHUB URLs
+            doodlerRightImg = new Image();
+            doodlerRightImg.src = "https://raw.githubusercontent.com/yourusername/your-repo/main/doodler-right.png";
+            doodler.img = doodlerRightImg;
+
+            doodlerLeftImg = new Image();
+            doodlerLeftImg.src = "https://raw.githubusercontent.com/yourusername/your-repo/main/doodler-left.png";
+
+            platformImg = new Image();
+            platformImg.src = "https://raw.githubusercontent.com/yourusername/your-repo/main/platform.png";
+
+            // Wait for all images to load
+            let imagesToLoad = 3;
+            let imagesLoaded = 0;
+
+            function imageLoaded() {
+                imagesLoaded++;
+                if (imagesLoaded === imagesToLoad) {
+                    startGame();
+                }
+            }
+
+            doodlerRightImg.onload = imageLoaded;
+            doodlerLeftImg.onload = imageLoaded;
+            platformImg.onload = imageLoaded;
+
+            // If images fail to load, use fallback
+            doodlerRightImg.onerror = function() {
+                console.log("Failed to load doodler-right.png, using fallback");
+                createFallbackImages();
+                imageLoaded();
+            };
+            doodlerLeftImg.onerror = function() {
+                console.log("Failed to load doodler-left.png, using fallback");
+                createFallbackImages();
+                imageLoaded();
+            };
+            platformImg.onerror = function() {
+                console.log("Failed to load platform.png, using fallback");
+                createFallbackImages();
+                imageLoaded();
+            };
+        }
+
+        function createFallbackImages() {
+            // Create simple fallback images if GitHub images fail to load
+            const createDoodlerRight = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = doodlerWidth;
+                canvas.height = doodlerHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#FF5733';
+                ctx.fillRect(10, 10, 26, 26);
+                ctx.fillStyle = '#FFC300';
+                ctx.beginPath();
+                ctx.arc(23, 15, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = 'black';
+                ctx.beginPath();
+                ctx.arc(26, 13, 2, 0, Math.PI * 2);
+                ctx.fill();
+                return canvas;
+            };
+
+            const createDoodlerLeft = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = doodlerWidth;
+                canvas.height = doodlerHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#FF5733';
+                ctx.fillRect(10, 10, 26, 26);
+                ctx.fillStyle = '#FFC300';
+                ctx.beginPath();
+                ctx.arc(23, 15, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = 'black';
+                ctx.beginPath();
+                ctx.arc(20, 13, 2, 0, Math.PI * 2);
+                ctx.fill();
+                return canvas;
+            };
+
+            const createPlatform = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = platformWidth;
+                canvas.height = platformHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#33CC33';
+                ctx.fillRect(0, 0, platformWidth, platformHeight);
+                ctx.fillStyle = '#229922';
+                for (let i = 0; i < platformWidth; i += 10) {
+                    ctx.fillRect(i, 0, 5, platformHeight);
+                }
+                return canvas;
+            };
+
+            if (!doodlerRightImg.complete || doodlerRightImg.naturalHeight === 0) {
+                const fallbackCanvas = createDoodlerRight();
+                doodlerRightImg.src = fallbackCanvas.toDataURL();
+                doodler.img = doodlerRightImg;
+            }
+
+            if (!doodlerLeftImg.complete || doodlerLeftImg.naturalHeight === 0) {
+                const fallbackCanvas = createDoodlerLeft();
+                doodlerLeftImg.src = fallbackCanvas.toDataURL();
+            }
+
+            if (!platformImg.complete || platformImg.naturalHeight === 0) {
+                const fallbackCanvas = createPlatform();
+                platformImg.src = fallbackCanvas.toDataURL();
+            }
+        }
+
+        function startGame() {
+            velocityY = initialVelocityY;
+            placePlatforms();
+            requestAnimationFrame(update);
+
+            // Touch controls
+            document.getElementById("leftBtn").addEventListener("touchstart", function(e) {
+                e.preventDefault();
+                moveLeft();
+            });
+
+            document.getElementById("leftBtn").addEventListener("mousedown", function(e) {
+                e.preventDefault();
+                moveLeft();
+            });
+
+            document.getElementById("rightBtn").addEventListener("touchstart", function(e) {
+                e.preventDefault();
+                moveRight();
+            });
+
+            document.getElementById("rightBtn").addEventListener("mousedown", function(e) {
+                e.preventDefault();
+                moveRight();
+            });
+
+            document.getElementById("leftBtn").addEventListener("touchend", stopMoving);
+            document.getElementById("leftBtn").addEventListener("mouseup", stopMoving);
+            document.getElementById("rightBtn").addEventListener("touchend", stopMoving);
+            document.getElementById("rightBtn").addEventListener("mouseup", stopMoving);
+
+            document.getElementById("restartBtn").addEventListener("click", restartGame);
+            
+            // Keyboard controls
+            document.addEventListener("keydown", function(e) {
+                if (e.code === "ArrowLeft" || e.code === "KeyA") {
+                    moveLeft();
+                } else if (e.code === "ArrowRight" || e.code === "KeyD") {
+                    moveRight();
+                }
+            });
+            
+            document.addEventListener("keyup", function(e) {
+                if (e.code === "ArrowLeft" || e.code === "ArrowRight" || 
+                    e.code === "KeyA" || e.code === "KeyD") {
+                    stopMoving();
+                }
+            });
+        }
+
+        function moveLeft() {
+            velocityX = -4;
+            doodler.img = doodlerLeftImg;
+        }
+
+        function moveRight() {
+            velocityX = 4;
+            doodler.img = doodlerRightImg;
+        }
+
+        function stopMoving() {
+            velocityX = 0;
+        }
+
+        function restartGame() {
+            doodler = {
+                img : doodlerRightImg,
+                x : doodlerX,
+                y : doodlerY,
+                width : doodlerWidth,
+                height : doodlerHeight
+            }
+
+            velocityX = 0;
+            velocityY = initialVelocityY;
+            score = 0;
+            maxScore = 0;
+            gameOver = false;
+            platformArray = [];
+            placePlatforms();
+            document.getElementById("restartBtn").style.display = "none";
+        }
+
+        function update() {
+            requestAnimationFrame(update);
+            if (gameOver) {
+                document.getElementById("restartBtn").style.display = "block";
+                return;
+            }
+            context.clearRect(0, 0, board.width, board.height);
+
+            //doodler
+            doodler.x += velocityX;
+            if (doodler.x > boardWidth) {
+                doodler.x = 0;
+            }
+            else if (doodler.x + doodler.width < 0) {
+                doodler.x = boardWidth;
+            }
+
+            velocityY += gravity;
+            doodler.y += velocityY;
+            if (doodler.y > board.height) {
+                gameOver = true;
+            }
+            context.drawImage(doodler.img, doodler.x, doodler.y, doodler.width, doodler.height);
+
+            //platforms
+            for (let i = 0; i < platformArray.length; i++) {
+                let platform = platformArray[i];
+                
+                // Move platforms down when doodler jumps up
+                if (velocityY < 0 && doodler.y < boardHeight*3/4) {
+                    platform.y -= initialVelocityY;
+                }
+                
+                // Check for collision
+                if (detectCollision(doodler, platform) && velocityY >= 0) {
+                    velocityY = initialVelocityY;
+                }
+                context.drawImage(platform.img, platform.x, platform.y, platform.width, platform.height);
+            }
+
+            // Remove platforms that have gone off screen and add new ones
+            while (platformArray.length > 0 && platformArray[0].y >= boardHeight) {
+                platformArray.shift();
+                newPlatform();
+            }
+
+            //score
+            updateScore();
+            context.fillStyle = "black";
+            context.font = "16px sans-serif";
+            context.fillText("Score: " + score, 5, 20);
+
+            if (gameOver) {
+                context.fillStyle = "red";
+                context.font = "20px sans-serif";
+                context.fillText("Game Over!", boardWidth/2 - 50, boardHeight/2);
+            }
+        }
+
+        function placePlatforms() {
+            platformArray = [];
+
+            let platform = {
+                img : platformImg,
+                x : boardWidth/2 - platformWidth/2,
+                y : boardHeight - 50,
+                width : platformWidth,
+                height : platformHeight
+            }
+
+            platformArray.push(platform);
+
+            for (let i = 0; i < 6; i++) {
+                let randomX = Math.floor(Math.random() * (boardWidth - platformWidth));
+                let platform = {
+                    img : platformImg,
+                    x : randomX,
+                    y : boardHeight - 75*i - 150,
+                    width : platformWidth,
+                    height : platformHeight
+                }
+            
+                platformArray.push(platform);
+            }
+        }
+
+        function newPlatform() {
+            let randomX = Math.floor(Math.random() * (boardWidth - platformWidth));
+            let platform = {
+                img : platformImg,
+                x : randomX,
+                y : -platformHeight,
+                width : platformWidth,
+                height : platformHeight
+            }
+
+            platformArray.push(platform);
+        }
+
+        function detectCollision(a, b) {
+            return a.x < b.x + b.width &&
+                   a.x + a.width > b.x &&
+                   a.y < b.y + b.height &&
+                   a.y + a.height > b.y;
+        }
+
+        function updateScore() {
+            // Increase score based on how high the doodler has jumped
+            let points = Math.floor(50 * Math.random());
+            if (velocityY < 0) {
+                maxScore += points;
+                if (score < maxScore) {
+                    score = maxScore;
+                }
+            }
+            else if (velocityY >= 0) {
+                maxScore -= points;
+            }
+        }
+    </script>
+</body>
+  </html>
